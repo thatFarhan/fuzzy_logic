@@ -93,8 +93,8 @@ def defuzzify(alpha, n_titik=1000):
     z_min, z_max = 0.0, 100.0
     step = (z_max - z_min) / n_titik
 
-    pembilang = 0.0
-    penyebut  = 0.0
+    numerator = 0.0
+    denominator  = 0.0
 
     z = z_min
     while z <= z_max:
@@ -105,13 +105,13 @@ def defuzzify(alpha, n_titik=1000):
 
         mu_aggregate = max(mu_tidak_layak, mu_cukup_layak, mu_layak, mu_sangat_layak)
 
-        pembilang += z * mu_aggregate
-        penyebut  += mu_aggregate
+        numerator += z * mu_aggregate
+        denominator  += mu_aggregate
         z += step
 
-    if penyebut == 0:
+    if denominator == 0:
         return 0.0
-    return pembilang / penyebut
+    return numerator / denominator
 
 def count_score(restoran):
     mu_service = fuzzify_service(restoran['pelayanan'])
