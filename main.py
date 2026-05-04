@@ -18,57 +18,57 @@ def read_file(path_file):
             })
     return data
 
-def left_trapezoid(x, a, b, c, d):
-    if x <= b:
-        return 1.0
-    elif b < x < d:
-        return (d - x) / (d - b)
-    else:
+def linear_ascent(x, a, b):
+    if x <= a:
         return 0.0
+    elif a < x <= b:
+        return (x - a) / (b - a)
+    else:
+        return 1.0
+
+def linear_descent(x, a, b):
+    if x >= b:
+        return 0.0
+    elif a <= x < b:
+        return (b - x) / (b - a)
+    else:
+        return 1.0
 
 def triangle(x, a, b, c):
     if x <= a or x >= c:
         return 0.0
     elif a < x <= b:
         return (x - a) / (b - a)
-    else:
+    elif b <= x < c:
         return (c - x) / (c - b)
-
-def right_trapezoid(x, a, b, c, d):
-    if x <= a:
-        return 0.0
-    elif a < x < b:
-        return (x - a) / (b - a)
-    else:
-        return 1.0
 
 def fuzzify_service(p):
     return {
-        'buruk' : left_trapezoid(p, 1, 1, 20, 40),
+        'buruk' : linear_descent(p, 1, 40),
         'sedang': triangle(p, 20, 50, 80),
-        'baik'  : right_trapezoid(p, 60, 80, 100, 100)
+        'baik'  : linear_ascent(p, 60, 100)
     }
 
 def fuzzify_price(h):
     return {
-        'murah' : left_trapezoid(h, 20000, 20000, 28000, 40000),
-        'sedang': triangle(h, 28000, 37500, 47000),
-        'mahal' : right_trapezoid(h, 40000, 47000, 55000, 55000)
+        'murah' : linear_descent(h, 20000, 33000),
+        'sedang': triangle(h, 26500, 37500, 50500),
+        'mahal' : linear_ascent(h, 44000, 55000)
     }
 
 def inference(mu_service, mu_price):
-    p = mu_service
-    h = mu_price
+    service = mu_service
+    price = mu_price
 
-    r1 = min(p['baik'],   h['murah'])   # Sangat_Layak
-    r2 = min(p['baik'],   h['sedang'])  # Layak
-    r3 = min(p['baik'],   h['mahal'])   # Cukup_Layak
-    r4 = min(p['sedang'], h['murah'])   # Layak
-    r5 = min(p['sedang'], h['sedang'])  # Cukup_Layak
-    r6 = min(p['sedang'], h['mahal'])   # Tidak_Layak
-    r7 = min(p['buruk'],  h['murah'])   # Cukup_Layak
-    r8 = min(p['buruk'],  h['sedang'])  # Tidak_Layak
-    r9 = min(p['buruk'],  h['mahal'])   # Tidak_Layak
+    r1 = min(service['baik'],   price['murah'])   # Sangat_Layak
+    r2 = min(service['baik'],   price['sedang'])  # Layak
+    r3 = min(service['baik'],   price['mahal'])   # Cukup_Layak
+    r4 = min(service['sedang'], price['murah'])   # Layak
+    r5 = min(service['sedang'], price['sedang'])  # Cukup_Layak
+    r6 = min(service['sedang'], price['mahal'])   # Tidak_Layak
+    r7 = min(service['buruk'],  price['murah'])   # Cukup_Layak
+    r8 = min(service['buruk'],  price['sedang'])  # Tidak_Layak
+    r9 = min(service['buruk'],  price['mahal'])   # Tidak_Layak
 
     return {
         'tidak_layak' : max(r6, r8, r9),
@@ -78,7 +78,7 @@ def inference(mu_service, mu_price):
     }
 
 def mu_output_tidak_layak(z):
-    return left_trapezoid(z, 0, 0, 15, 35)
+    return linear_descent(z, 0, 35)
 
 def mu_output_cukup_layak(z):
     return triangle(z, 20, 40, 60)
@@ -87,9 +87,9 @@ def mu_output_layak(z):
     return triangle(z, 45, 65, 85)
 
 def mu_output_sangat_layak(z):
-    return right_trapezoid(z, 65, 85, 100, 100)
+    return linear_ascent(z, 65, 100)
 
-def defuzzifikasi(alpha, n_titik=1000):
+def defuzzify(alpha, n_titik=1000):
     z_min, z_max = 0.0, 100.0
     step = (z_max - z_min) / n_titik
 
@@ -98,37 +98,37 @@ def defuzzifikasi(alpha, n_titik=1000):
 
     z = z_min
     while z <= z_max:
-        mu_tl = min(alpha['tidak_layak'],  mu_output_tidak_layak(z))
-        mu_cl = min(alpha['cukup_layak'],  mu_output_cukup_layak(z))
-        mu_l  = min(alpha['layak'],        mu_output_layak(z))
-        mu_sl = min(alpha['sangat_layak'], mu_output_sangat_layak(z))
+        mu_tidak_layak = min(alpha['tidak_layak'],  mu_output_tidak_layak(z))
+        mu_cukup_layak = min(alpha['cukup_layak'],  mu_output_cukup_layak(z))
+        mu_layak  = min(alpha['layak'],        mu_output_layak(z))
+        mu_sangat_layak = min(alpha['sangat_layak'], mu_output_sangat_layak(z))
 
-        mu_agg = max(mu_tl, mu_cl, mu_l, mu_sl)
+        mu_aggregate = max(mu_tidak_layak, mu_cukup_layak, mu_layak, mu_sangat_layak)
 
-        pembilang += z * mu_agg
-        penyebut  += mu_agg
+        pembilang += z * mu_aggregate
+        penyebut  += mu_aggregate
         z += step
 
     if penyebut == 0:
         return 0.0
     return pembilang / penyebut
 
-def hitung_skor(restoran):
-    mu_p = fuzzify_service(restoran['pelayanan'])
-    mu_h = fuzzify_price(restoran['harga'])
-    alpha = inference(mu_p, mu_h)
-    skor  = defuzzifikasi(alpha)
+def count_score(restoran):
+    mu_service = fuzzify_service(restoran['pelayanan'])
+    mu_price = fuzzify_price(restoran['harga'])
+    alpha = inference(mu_service, mu_price)
+    skor  = defuzzify(alpha)
     return round(skor, 4)
 
 def process_all(data):
     hasil = []
     for r in data:
-        skor = hitung_skor(r)
+        score = count_score(r)
         hasil.append({
             'id'       : r['id'],
             'pelayanan': r['pelayanan'],
             'harga'    : r['harga'],
-            'skor'     : skor
+            'skor'     : score
         })
     hasil.sort(key=lambda x: x['skor'], reverse=True)
     return hasil[:5]
